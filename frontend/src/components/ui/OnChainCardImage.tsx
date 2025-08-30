@@ -13,29 +13,89 @@ interface OnChainCardImageProps {
 // SVG data URL decoder
 function decodeSVGFromURI(uri: string): string | null {
   try {
-    if (!uri) return null
+    console.log('🔍 Decoding URI:', uri.substring(0, 50) + '...')
+    
+    if (!uri) {
+      console.log('❌ URI is empty or null')
+      return null
+    }
 
     // Check if it's a data URI
     if (uri.startsWith('data:')) {
       const parts = uri.split(',')
-      if (parts.length < 2) return null
+      if (parts.length < 2) {
+        console.log('❌ Invalid data URI format (no comma separator)')
+        return null
+      }
 
+      console.log(`📦 Data URI header: ${parts[0]}`)
       const data = parts[1]
+      console.log(`📦 Attempting to decode base64 data (${data.length} chars)`)
+      
       const decoded = atob(data) // Base64 decode
+      console.log(`✅ Base64 decoded to JSON (${decoded.length} chars)`)
 
       // Parse JSON metadata
       const metadata = JSON.parse(decoded)
+      console.log('✅ Parsed JSON metadata:', Object.keys(metadata))
       
       // Extract SVG from image field (should be data:image/svg+xml;base64,...)
-      if (metadata.image && metadata.image.startsWith('data:image/svg+xml;base64,')) {
-        const svgBase64 = metadata.image.split(',')[1]
-        return atob(svgBase64)
+      if (metadata.image) {
+        console.log(`🖼️  Found image field: ${metadata.image.substring(0, 50)}...`)
+        
+        if (metadata.image.startsWith('data:image/svg+xml;base64,')) {
+          const svgBase64 = metadata.image.split(',')[1]
+          console.log(`🎨 Decoding SVG base64 (${svgBase64.length} chars)`)
+          
+          let svgContent = atob(svgBase64)
+          console.log(`✅ SVG decoded (${svgContent.length} chars)`)
+          
+          // Fix SVG format if it starts with raw 'xml version' instead of '<?xml version'
+          if (svgContent.startsWith('xml version=')) {
+            console.log('🔧 Fixing XML declaration')
+            svgContent = '<?' + svgContent
+          }
+          
+          // Fix missing spaces in XML declaration (critical for browser parsing)
+          svgContent = svgContent.replace(/version="1\.0"encoding="UTF-8"/, 'version="1.0" encoding="UTF-8"')
+          svgContent = svgContent.replace(/encoding="UTF-8"\?><svg/, 'encoding="UTF-8"?><svg ')
+          
+          // Fix missing spaces between SVG attributes (critical!)
+          // Run multiple passes to catch all missing spaces
+          let prevLength = 0
+          while (svgContent.length !== prevLength) {
+            prevLength = svgContent.length
+            svgContent = svgContent.replace(/("[^"]*")([a-zA-Z]+=")/g, '$1 $2')
+          }
+          
+          // Additional specific fixes for common patterns
+          svgContent = svgContent.replace(/viewBox="([^"]*)"/g, ' viewBox="$1"')
+          svgContent = svgContent.replace(/xmlns="([^"]*)"/g, ' xmlns="$1"')
+          svgContent = svgContent.replace(/  +/g, ' ') // Clean up multiple spaces
+          
+          console.log('🔧 Fixed XML and SVG attribute formatting')
+          
+          // Ensure the SVG content is properly formatted
+          if (!svgContent.includes('<svg')) {
+            console.warn('❌ SVG content does not contain <svg> tag:', svgContent.substring(0, 200))
+            return null
+          }
+          
+          console.log(`✅ Valid SVG content (${svgContent.length} chars):`, svgContent.substring(0, 100))
+          return svgContent
+        } else {
+          console.log('❌ Image field is not SVG data URL format:', metadata.image.substring(0, 100))
+        }
+      } else {
+        console.log('❌ No image field found in metadata')
       }
+    } else {
+      console.log('❌ URI is not a data URI')
     }
 
     return null
   } catch (error) {
-    console.warn('Failed to decode SVG from URI:', error)
+    console.error('❌ Failed to decode SVG from URI:', error)
     return null
   }
 }
@@ -66,12 +126,14 @@ export function OnChainCardImage({
   // Try to extract SVG from URI
   useEffect(() => {
     if (uri && !useStatic) {
+      console.log(`[Card ${card.cardId}] Processing URI:`, uri.substring(0, 100) + '...')
       const decoded = decodeSVGFromURI(uri)
       if (decoded) {
+        console.log(`[Card ${card.cardId}] Successfully decoded SVG (${decoded.length} chars)`)
         setSvgContent(decoded)
         setImageError(false)
       } else {
-        console.log(`No valid SVG found in URI for card ${card.cardId}, falling back to static`)
+        console.log(`[Card ${card.cardId}] No valid SVG found in URI, falling back to static`)
         setUseStatic(true)
       }
     }
@@ -80,7 +142,7 @@ export function OnChainCardImage({
   // Handle URI loading error
   useEffect(() => {
     if (uriError) {
-      console.log(`URI error for card ${card.cardId}, falling back to static:`, uriError)
+      console.error(`[Card ${card.cardId}] URI error, falling back to static:`, uriError)
       setUseStatic(true)
     }
   }, [uriError, card.cardId])
@@ -103,17 +165,40 @@ export function OnChainCardImage({
 
   // Show on-chain SVG if available
   if (svgContent && !imageError && !useStatic) {
-    return (
-      <div 
-        className={`${className}`}
-        dangerouslySetInnerHTML={{ __html: svgContent }}
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center' 
-        }}
-      />
-    )
+    try {
+      // Clean up the SVG content and create a proper data URL
+      let cleanSvg = svgContent.trim()
+      
+      // Fix any remaining XML formatting issues
+      cleanSvg = cleanSvg.replace(/\?><svg/g, '?>\n<svg')
+      
+      // Ensure proper SVG structure
+      if (!cleanSvg.startsWith('<svg')) {
+        // If it starts with XML declaration, find the SVG tag
+        const svgStart = cleanSvg.indexOf('<svg')
+        if (svgStart > -1) {
+          cleanSvg = cleanSvg.substring(svgStart)
+        }
+      }
+      
+      console.log(`[Card ${card.cardId}] Using direct SVG injection (${cleanSvg.length} chars)`)
+      
+      // Use direct SVG injection instead of data URLs
+      return (
+        <div 
+          className={`${className} flex items-center justify-center`}
+          dangerouslySetInnerHTML={{ __html: cleanSvg }}
+          style={{
+            width: '100%',
+            height: '100%'
+          }}
+        />
+      )
+    } catch (error) {
+      console.error(`[Card ${card.cardId}] Error creating SVG data URL:`, error)
+      setImageError(true)
+      // Fall through to next fallback
+    }
   }
 
   // Fallback to static file
@@ -130,6 +215,15 @@ export function OnChainCardImage({
   }
 
   // Ultimate fallback to emoji
+  console.log(`[Card ${card.cardId}] Using fallback emoji - State:`, {
+    svgContent: !!svgContent,
+    imageError,
+    useStatic,
+    isLoadingURI,
+    hasURI: !!uri,
+    uriError: !!uriError
+  })
+  
   return (
     <div className={`flex items-center justify-center bg-gray-800 ${className}`}>
       <span className="text-4xl">{fallbackIcon}</span>

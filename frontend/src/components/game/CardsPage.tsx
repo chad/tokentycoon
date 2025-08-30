@@ -54,6 +54,18 @@ export const CardsPage: React.FC<CardsPageProps> = ({ onClose = () => window.loc
     return matchesSearch && matchesType;
   });
 
+  // Debug logging for first few cards
+  useEffect(() => {
+    if (cards.length > 0) {
+      console.log('📊 Cards data sample:', cards.slice(0, 3).map(card => ({
+        cardId: card.cardId,
+        name: card.name,
+        hasName: !!card.name,
+        cardType: card.cardType
+      })));
+    }
+  }, [cards]);
+
   const getTypeColor = (type: CardType) => {
     switch (type) {
       case 'Chain': return 'bg-blue-600';

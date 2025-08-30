@@ -211,10 +211,13 @@ export function useNFTCards(cardIds: number[] = []) {
     }
   ]).flat()
 
-  const { data: contractResults, isLoading } = useReadContracts({
+  const { data: contractResults, isLoading, error } = useReadContracts({
     contracts,
     query: {
-      enabled: missingCardIds.length > 0
+      enabled: missingCardIds.length > 0,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff up to 30s
+      staleTime: 5 * 60 * 1000, // 5 minutes
     }
   })
 
@@ -230,10 +233,43 @@ export function useNFTCards(cardIds: number[] = []) {
 
       if (metadataResult?.result && abilitiesResult?.result) {
         const cardId = missingCardIds[i]
-        const metadata = metadataResult.result as any[]
+        const metadata = metadataResult.result as any
         const abilities = abilitiesResult.result as any[]
 
-        const [name, description, cost, cardType, svgPointer, jsonPointer, contentHash, maxSupply, totalMinted, tradeable, finalized] = metadata
+        // Handle both array (old format) and object (new format) from contract
+        let name, description, cost, cardType, svgPointer, jsonPointer, contentHash, maxSupply, totalMinted, tradeable, finalized
+        
+        if (Array.isArray(metadata)) {
+          // Old tuple format - destructure as array
+          [name, description, cost, cardType, svgPointer, jsonPointer, contentHash, maxSupply, totalMinted, tradeable, finalized] = metadata
+        } else if (metadata && typeof metadata === 'object') {
+          // New struct format - access as object properties
+          name = metadata.name
+          description = metadata.description
+          cost = metadata.cost
+          cardType = metadata.cardType
+          svgPointer = metadata.svgPointer
+          jsonPointer = metadata.jsonPointer
+          contentHash = metadata.contentHash
+          maxSupply = metadata.maxSupply
+          totalMinted = metadata.totalMinted
+          tradeable = metadata.tradeable
+          finalized = metadata.finalized
+        } else {
+          // Skip invalid metadata without warning since we handle both formats
+          continue
+        }
+
+        // Ensure abilities is an array
+        if (!Array.isArray(abilities)) {
+          console.warn(`Card ${cardId}: abilities is not an array:`, abilities)
+          continue
+        }
+
+        // Skip cards that are not initialized (empty name)
+        if (!name || name.trim() === '') {
+          continue
+        }
 
         const card: OnChainCardMetadata = {
           cardId,
@@ -267,9 +303,15 @@ export function useNFTCards(cardIds: number[] = []) {
     return [...cachedCards, ...fetchedCards].sort((a, b) => a.cardId - b.cardId)
   }, [cachedCards, fetchedCards])
 
+  // Log errors for debugging
+  if (error) {
+    console.warn('Error fetching NFT cards:', error)
+  }
+
   return {
     cards: allCards,
     isLoading,
+    error,
     cacheStats: cacheManager.getCacheStats()
   }
 }
@@ -285,8 +327,8 @@ export function useAllNFTCards() {
     if (cached.length > 0) {
       setDiscoveredCardIds(cached.map(c => c.cardId))
     } else {
-      // Try common card IDs (3-91, skipping 1-2 which are known corrupted)
-      const commonIds = Array.from({ length: 89 }, (_, i) => i + 3) // Cards 3-91
+      // Try all card IDs 1-91 (our full card range)
+      const commonIds = Array.from({ length: 91 }, (_, i) => i + 1) // Cards 1-91
       setDiscoveredCardIds(commonIds)
     }
   }, [])
@@ -312,8 +354,28 @@ export function useCardURI(cardId: number) {
     args: [BigInt(cardId)],
     query: {
       enabled: !!cardId && cardId > 0,
+      retry: 3,
+      staleTime: 5 * 60 * 1000, // 5 minutes
     }
   })
+
+  // Debug logging
+  useEffect(() => {
+    if (cardId > 0) {
+      console.log(`🔗 [useCardURI ${cardId}] Status:`, { 
+        hasUri: !!uri, 
+        isLoading, 
+        hasError: !!error,
+        contractAddress: contractAddresses.NFT_CARDS
+      })
+      if (error) {
+        console.error(`🔗 [useCardURI ${cardId}] Error:`, error)
+      }
+      if (uri) {
+        console.log(`🔗 [useCardURI ${cardId}] URI received:`, uri.substring(0, 50) + '...')
+      }
+    }
+  }, [cardId, uri, isLoading, error, contractAddresses.NFT_CARDS])
 
   return {
     uri: uri as string,

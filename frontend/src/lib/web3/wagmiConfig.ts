@@ -1,42 +1,15 @@
 // Import createConfig from @privy-io/wagmi, not wagmi
 import { createConfig } from '@privy-io/wagmi'
 import { http } from 'wagmi'
+import { baseSepolia, mainnet, base } from '@/lib/web3/config.production'
 
-// Local development network configuration (Anvil default)
-const localChain = {
-  id: 31337,
-  name: 'Local Development',
-  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['http://localhost:8545'] },
-  },
-  blockExplorers: {
-    default: { name: 'Local Explorer', url: 'http://localhost:8545' },
-  },
-} as const
-
-// Base Sepolia chain for production
-const baseSepoliaChain = {
-  id: 84532,
-  name: 'Base Sepolia',
-  nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['https://sepolia.base.org'] },
-  },
-  blockExplorers: {
-    default: { name: 'Base Sepolia Explorer', url: 'https://sepolia.basescan.org' },
-  },
-} as const
-
-// Determine which chain to use based on environment
-const isProduction = import.meta.env.PROD
-
-// Wagmi configuration using @privy-io/wagmi's createConfig
-// This ensures proper integration with Privy's embedded wallets
+// Wagmi configuration using @privy-io/wagmi's createConfig  
+// Always use production chains to avoid localhost connection issues
 export const wagmiConfig = createConfig({
-  chains: isProduction ? [baseSepoliaChain] as const : [localChain, baseSepoliaChain] as const,
+  chains: [baseSepolia, mainnet, base] as const,
   transports: {
-    [localChain.id]: http('http://localhost:8545'),
-    [baseSepoliaChain.id]: http('https://sepolia.base.org'),
+    [baseSepolia.id]: http(baseSepolia.rpcUrls.default.http[0]),
+    [mainnet.id]: http(mainnet.rpcUrls.default.http[0]),
+    [base.id]: http(base.rpcUrls.default.http[0]),
   },
 })

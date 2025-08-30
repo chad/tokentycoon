@@ -1,0 +1,25 @@
+{
+  "name": "Audit",
+  "description": "This DeFi protocol cannot be targeted by an exploit.",
+  "image": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzc1IiBoZWlnaHQ9IjUyNSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojMkQxMTAwO3N0b3Atb3BhY2l0eToxIiAvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6IzNEMUEzRDtzdG9wLW9wYWNpdHk6MSIgLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjE1IiByeT0iMTUiLz48cmVjdCB4PSIxMiIgeT0iMTIiIHdpZHRoPSIzNTEiIGhlaWdodD0iNTAxIiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkE1MDAiIHN0cm9rZS13aWR0aD0iNCIgcng9IjEwIiByeT0iMTAiLz48cmVjdCB4PSIyNSIgeT0iMjAwIiB3aWR0aD0iMzI1IiBoZWlnaHQ9IjEyNSIgZmlsbD0iIzAwMDgxNCIgcng9IjEyIiByeT0iMTIiLz48dGV4dCB4PSIxODcuNSIgeT0iMjcwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjRkZGRkZGIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BdWRpdDwvdGV4dD48dGV4dCB4PSIxODcuNSIgeT0iMzAwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiNGRkE1MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlRva2VuIFR5Y29vbiBDYXJkPC90ZXh0Pjwvc3ZnPg==",
+  "attributes": [
+    {
+      "trait_type": "Cost",
+      "value": 1
+    },
+    {
+      "trait_type": "Type",
+      "value": "EOA"
+    },
+    {
+      "trait_type": "Total Minted",
+      "value": 0
+    }
+  ],
+  "abilities": [
+    {
+      "type": "protection",
+      "amount": 1
+    }
+  ]
+}
