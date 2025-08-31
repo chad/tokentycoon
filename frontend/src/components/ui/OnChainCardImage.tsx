@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useCardURI } from '@/lib/hooks/useNFTCardsContract'
 import type { OnChainCardMetadata } from '@/lib/hooks/useNFTCardsContract'
 import { getAssetUrl } from '@/lib/utils/assets'
@@ -120,24 +120,40 @@ export function OnChainCardImage({
   const [imageError, setImageError] = useState(false)
   const [useStatic, setUseStatic] = useState(useFallback)
   
+  // Debug to identify modal vs grid instances
+  const instanceId = useRef(Math.random().toString(36).substr(2, 9))
+  
+  // Use ref to persist SVG content across renders
+  const persistedSvgContent = useRef<string | null>(null)
+  
+  // Track the previous card ID to detect actual changes
+  const previousCardId = useRef<number>(card.cardId)
+  
+  console.log(`[OnChainCardImage ${instanceId.current}] Rendering card ${card.cardId} (${card.name})`)
+  
   // Fetch on-chain URI
   const { uri, isLoading: isLoadingURI, error: uriError } = useCardURI(card.cardId)
   
   // Try to extract SVG from URI
   useEffect(() => {
     if (uri && !useStatic) {
-      console.log(`[Card ${card.cardId}] Processing URI:`, uri.substring(0, 100) + '...')
+      console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Processing URI:`, uri.substring(0, 100) + '...')
       const decoded = decodeSVGFromURI(uri)
       if (decoded) {
-        console.log(`[Card ${card.cardId}] Successfully decoded SVG (${decoded.length} chars)`)
+        console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Successfully decoded SVG (${decoded.length} chars)`)
+        console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Setting SVG content in state and ref...`)
         setSvgContent(decoded)
+        persistedSvgContent.current = decoded
         setImageError(false)
+        console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] SVG content set, should not fall back to static`)
       } else {
-        console.log(`[Card ${card.cardId}] No valid SVG found in URI, falling back to static`)
+        console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] No valid SVG found in URI, falling back to static`)
         setUseStatic(true)
       }
+    } else {
+      console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Skipping decode - URI: ${!!uri}, useStatic: ${useStatic}`)
     }
-  }, [uri, card.cardId, useStatic])
+  }, [uri, card.cardId]) // Removed useStatic dependency to prevent re-running when useStatic changes
 
   // Handle URI loading error
   useEffect(() => {
@@ -147,12 +163,34 @@ export function OnChainCardImage({
     }
   }, [uriError, card.cardId])
 
-  // Reset error states when card changes
+  // Reset error states when card changes (but not when useFallback changes)
   useEffect(() => {
+    // Check if card actually changed
+    if (previousCardId.current === card.cardId) {
+      console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Same card, skipping reset`)
+      return
+    }
+    
+    // Card actually changed - update the ref and reset state
+    console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Card changed from ${previousCardId.current} to ${card.cardId}, resetting state`)
+    previousCardId.current = card.cardId
+    
     setImageError(false)
+    if (svgContent || persistedSvgContent.current) {
+      console.log(`[Card ${card.cardId}] Resetting component state (had SVG: ${svgContent?.length || persistedSvgContent.current?.length} chars)`)
+    }
     setSvgContent(null)
+    persistedSvgContent.current = null
     setUseStatic(useFallback)
-  }, [card.cardId, useFallback])
+  }, [card.cardId, useFallback]) // Re-added useFallback since we're now checking actual card changes
+
+  // Handle useFallback changes without resetting SVG content
+  useEffect(() => {
+    // Only update useStatic if we don't already have valid SVG content
+    if (!svgContent) {
+      setUseStatic(useFallback)
+    }
+  }, [useFallback, svgContent])
 
   // Loading state
   if (isLoadingURI && !useStatic) {
@@ -163,11 +201,13 @@ export function OnChainCardImage({
     )
   }
 
-  // Show on-chain SVG if available
-  if (svgContent && !imageError && !useStatic) {
+  // Show on-chain SVG if available (prefer state, fallback to ref)
+  const currentSvgContent = svgContent || persistedSvgContent.current
+  if (currentSvgContent && !imageError && !useStatic) {
+    console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Rendering SVG content (${currentSvgContent.length} chars) - source: ${svgContent ? 'state' : 'ref'}`);
     try {
       // Clean up the SVG content and create a proper data URL
-      let cleanSvg = svgContent.trim()
+      let cleanSvg = currentSvgContent.trim()
       
       // Fix any remaining XML formatting issues
       cleanSvg = cleanSvg.replace(/\?><svg/g, '?>\n<svg')
@@ -215,8 +255,12 @@ export function OnChainCardImage({
   }
 
   // Ultimate fallback to emoji
-  console.log(`[Card ${card.cardId}] Using fallback emoji - State:`, {
+  console.log(`[Card ${card.cardId}] [Instance ${instanceId.current}] Using fallback emoji - State:`, {
     svgContent: !!svgContent,
+    svgLength: svgContent?.length || 0,
+    persistedSvgContent: !!persistedSvgContent.current,
+    persistedSvgLength: persistedSvgContent.current?.length || 0,
+    currentSvgContent: !!(svgContent || persistedSvgContent.current),
     imageError,
     useStatic,
     isLoadingURI,
